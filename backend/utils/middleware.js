@@ -34,11 +34,18 @@ const errorHandler = (error, request,response)  => {
     })
   }
 
-  if( error.name === 'SyntaxError' ) {
+  else if( error.name === 'SyntaxError' ) {
     return response.status(400).json({
       error: 'Invalid request syntax',
       message: error.message
     })
+  }
+  else if (error.name === 'JsonWebTokenError'){
+    return response.status(401).json({ error: 'token invalid' })
+  } 
+  
+  else if (error.name === 'TokenExpiredError') {
+    return response.status(401).json({ error: 'token expired' })
   }
 
   response.status(500).json({
