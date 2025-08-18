@@ -5,15 +5,19 @@ const { db } = require('../database/db')
 const table = require('../database/schema')
 const config = require('../utils/config')
 
-const {eq} = require('drizzle-orm')
+const {eq, avg} = require('drizzle-orm')
 
 userRouter.get('/', async (request, response, next) => {
     try {
         const decodedToken = jwt.verify(request.token, config.SECRET)
+        const userRole = decodedToken.role
 
-        if(decodedToken.role !== 'SYSTEM_ADMIN'){
+        if(userRole !== 'SYSTEM_ADMIN'){
             return response.status(403).json({error: 'Access denied, admin only'})
         }
+
+        const stores = table.storesTable.as('stores')
+        const ratings = table.ratingsTable.as('ratings')
 
         const [users] = await db
             .select({
@@ -21,8 +25,12 @@ userRouter.get('/', async (request, response, next) => {
                 email: table.usersTable.email,
                 address: table.usersTable.address,
                 role: table.usersTable.role,
+                rating: avg(ratings.rating).default(null)
             })
             .from(table.usersTable)
+            .leftJoin(stores, (join) => join.on(eq(table.usersTable.id, stores.ownerId)))
+            .leftJoin(ratings, (join) => join.on(eq(stores.id, ratings.storeId)))
+            .groupBy(table.usersTable.id,table.usersTable.name,table.usersTable.email,table.usersTable.address,table.usersTable.role)
         
         return response.json(users)
     } catch (error) {

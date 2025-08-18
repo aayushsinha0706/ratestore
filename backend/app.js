@@ -6,6 +6,7 @@ const middleware = require('./utils/middleware')
 
 const authRouter = require('./controllers/auth')
 const userRouter = require('./controllers/user')
+const storeRouter = require('./controllers/store')
 
 app.use(cors())
 app.use(express.static('dist'))
@@ -16,6 +17,7 @@ app.use(middleware.tokenExtractor)
 
 app.use('/api/auth', authRouter)
 app.use('/api/users', userRouter)
+app.use('/api/store', storeRouter)
 app.use(middleware.unknownEndpoint)
 app.use(middleware.errorHandler)
 
