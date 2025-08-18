@@ -6,7 +6,7 @@ const table = require('../database/schema')
 const config = require('../utils/config')
 
 const {eq, avg} = require('drizzle-orm')
-
+const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{8,16}$/
 userRouter.get('/', async (request, response, next) => {
     try {
         const decodedToken = jwt.verify(request.token, config.SECRET)
@@ -19,7 +19,7 @@ userRouter.get('/', async (request, response, next) => {
         const stores = table.storesTable.as('stores')
         const ratings = table.ratingsTable.as('ratings')
 
-        const [users] = await db
+        const users = await db
             .select({
                 name: table.usersTable.name,
                 email: table.usersTable.email,
@@ -112,9 +112,10 @@ userRouter.post('/', async (request, response, next) => {
 
 userRouter.put('/password', async (request, response, next) => {
     try {
-            const { email, oldPassword, newPassword } = request.body
+            const decodedToken = jwt.verify(request.token, config.SECRET)
+            const requestingUserId = decodedToken.id
 
-            const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{8,16}$/
+            const { email, oldPassword, newPassword } = request.body
 
             if (!passwordRegex.test(newPassword)) {
                 return response.status(400).json({
@@ -125,6 +126,10 @@ userRouter.put('/password', async (request, response, next) => {
                 .select()
                 .from(table.usersTable)
                 .where(eq(table.usersTable.email, email))
+            
+             if (!user || user.id !== requestingUserId) {
+                return response.status(403).json({ error: 'Access denied' })
+            }
             
             const passwordCorrect = user
                 ? await bcrypt.compare(oldPassword, user.passwordHash)

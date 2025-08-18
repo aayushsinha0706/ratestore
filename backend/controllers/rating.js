@@ -12,6 +12,25 @@ ratingRouter.post('/store/:storeId', async (request, response, next) => {
 
         const decodedToken = jwt.verify(request.token, config.SECRET)
         const userId = decodedToken.id
+        const userRole = decodedToken.role
+
+
+        if (userRole !== 'NORMAL_USER'){
+            return response.status(403).json({error: 'Access denied, normal users only'})
+        }
+           
+        const [store] = await db
+            .select()
+            .from(table.storesTable)
+            .where(eq(table.storesTable.id, storeId))
+        
+        if (!store) {
+            return response.status(404).json({ error: 'Store not found' })
+        }
+
+        if (store.ownerId === userId) {
+            return response.status(400).json({ error: 'You cannot rate your own store' })
+        }
         
         const {rating} = request.body
 
@@ -31,7 +50,7 @@ ratingRouter.post('/store/:storeId', async (request, response, next) => {
             .returning({
                 userId: table.ratingsTable.userId,
                 storeId: table.ratingsTable.storeId,
-                reting: table.ratingsTable.rating
+                rating: table.ratingsTable.rating
             })
         
         return response.status(201).json(newRating)
@@ -77,6 +96,15 @@ ratingRouter.get('/store/:storeId', async (request, response, next) => {
     try {
         const storeId = request.params.storeId
 
+        const decodedToken= jwt.verify(request.token, config.SECRET)
+        const userRole = decodedToken.role
+
+        if (userRole !== 'SYSTEM_ADMIN' && userRole !== 'STORE_OWNER') {
+            return response.status(403).json({ 
+                error: 'Access denied' 
+            })
+        }
+
         const [existingStore] = await db
             .select()
             .from(table.storesTable)
@@ -84,6 +112,12 @@ ratingRouter.get('/store/:storeId', async (request, response, next) => {
         
         if (!existingStore){
             return response.status(400).json({error: 'store not found'})
+        }
+
+        if (userRole === 'STORE_OWNER' && existingStore.ownerId !== decodedToken.id) {
+            return response.status(403).json({ 
+                error: 'You can only view ratings for your own store' 
+            })
         }
 
         const storeRatings = await db

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken')
-const {count,eq} = require('drizzle-orm')
+const {count,eq, avg, desc} = require('drizzle-orm')
 const dashboardRouter = require('express').Router()
 const {db} = require('../database/db')
 const table = require('../database/schema')
@@ -47,35 +47,57 @@ dashboardRouter.get('/admin', async (request, response, next) => {
 dashboardRouter.get('/store', async (request, response, next) => {
     try {
         const decodedToken = jwt.verify(request.token, config.SECRET)
-        const storeId = decodedToken.id
+        const userId = decodedToken.id
         const userRole = decodedToken.role
 
         if (userRole !== 'STORE_OWNER'){
             return response.status(403).json({error: 'Access denied, store owner only'})
         }
 
-        const avgRatings = table.ratingsTable.as('avg_ratings')
-        const [averageRating] = await db
+        const [store] = await db
             .select({
-                rating: avg(avgRatings.rating).default(0)
+                id: table.storesTable.id,
+                name: table.storesTable.name
             })
             .from(table.storesTable)
-            .where(eq(table.storesTable.storeId, storeId))
-            .leftJoin(avgRatings, (join) => join.on(eq(table.storesTable.id, avgRatings.storeId)))
+            .where(eq(table.storesTable.ownerId, userId))
+
+        if (!store) {
+            return response.status(404).json({ error: 'Store not found for this owner' });
+        }
         
-        const avgRating = averageRating.rating
+        const storeId = store.id
+
+        const [averageRating] = await db
+            .select({
+                rating: avg(table.ratingsTable.rating)
+            })
+            .from(table.ratingsTable)
+            .where(eq(table.ratingsTable.storeId, storeId))
+        
+        const avgRating = averageRating.rating ? averageRating.rating : 0
 
         const users = await db
             .select({
                 name: table.usersTable.name,
                 email: table.usersTable.email,
+                rating: table.ratingsTable.rating,
             })
             .from(table.usersTable)
-            .leftJoin(table.ratingsTable, (join) => join.on(eq(table.usersTable.id,table.ratingsTable.userId)))
-            .where(eq(table.ratingsTable.storeId,storeId))
+            .innerJoin(
+                table.ratingsTable, 
+                eq(table.usersTable.id, table.ratingsTable.userId)
+            )
+            .where(eq(table.ratingsTable.storeId, storeId))
+            .orderBy(desc(table.ratingsTable.createdAt))
 
         return response.json({
-            avgRating,
+            store: {
+                id: store.id,
+                name: store.name
+            },
+            avgRating: Number(avgRating).toFixed(1), 
+            totalRatings: users.length,
             users
         })
 

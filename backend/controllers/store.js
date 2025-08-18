@@ -4,7 +4,6 @@ const { avg, eq } = require('drizzle-orm')
 const { db } = require('../database/db')
 const table = require('../database/schema')
 const config = require('../utils/config')
-const { use } = require('react')
 
 storeRouter.get('/', async (request, response, next) => {
     try {
@@ -14,7 +13,7 @@ storeRouter.get('/', async (request, response, next) => {
 
         if (userRole === 'SYSTEM_ADMIN'){
             const avgRatings = table.ratingsTable.as('avg_ratings')
-            const [stores] = await db
+            const stores = await db
                 .select({
                     name: table.storesTable.name,
                     email: table.storesTable.email,
@@ -29,7 +28,7 @@ storeRouter.get('/', async (request, response, next) => {
         } else if (userRole ==='NORMAL_USER') {
             const avgRatings = table.ratingsTable.as('avg_ratings')
             const userRatings = table.ratingsTable.as('user_ratings')
-            const [stores] = await db
+            const stores = await db
                 .select({
                     name: table.storesTable.name,
                     address: table.storesTable.address,
